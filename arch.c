@@ -171,8 +171,9 @@ int inserirContato(Contato c) {
     strcat(nomeCompleto, c.sobrenome);
 
     int i = 0;
+    char *nomeCompletoAtIndex;
     while (i < freeAtIndex) {
-        char *nomeCompletoAtIndex = malloc(sizeof(contatos[i]->nome) + sizeof(contatos[i]->sobrenome) + sizeof(char));
+        nomeCompletoAtIndex = malloc(sizeof(contatos[i]->nome) + sizeof(contatos[i]->sobrenome) + sizeof(char));
         strcpy(nomeCompletoAtIndex, contatos[i]->nome);
         strcat(nomeCompletoAtIndex, " ");
         strcat(nomeCompletoAtIndex, contatos[i]->sobrenome);
@@ -180,11 +181,8 @@ int inserirContato(Contato c) {
             erroGUI("Um contato com esse nome ja existe!");
             return 0;
         }
-        free(nomeCompletoAtIndex);
         i++;
     }
-
-    free(nomeCompleto);
 
     // validar emails
     for (i = 0; i < 3; i++) {
@@ -226,14 +224,18 @@ int inserirContato(Contato c) {
 
 int *buscarContatoNome(const char *s) {
     static int *indexes;
-    indexes = malloc(sizeof(indexes));
-    int i, j = 0;
+    indexes = malloc(sizeof(int));
+    int i, j = 0, k = 0;
     for (i = 0; i < freeAtIndex; i++) {
         if (strstr(contatos[i]->nome, s)) {
-            &indexes[j] = (int *)malloc(sizeof(int));
             indexes[j] = i;
             j++;
+            realloc(indexes, sizeof(*indexes) + sizeof(int));
+            k++;
         }
+    }
+    if (k == 0) {
+        indexes[0] = -1;
     }
     return indexes;
 }
@@ -361,13 +363,13 @@ void inserirContatoGUI() {
 
 void contatoGUI(const int i) {
     printf("---------------------------------------------\n");
-    printf("NOME: %s SOBRENOME: %s", contatos[i]->nome, contatos[i]->sobrenome);
-    printf("E-MAILS:\nE-MAIL 1: %s", contatos[i]->email[0]);
-    printf("E-MAIL 2: %s", contatos[i]->email[1]);
-    printf("E-MAIL 3: %s", contatos[i]->email[2]);
-    printf("TELEFONES:\nTELEFONE 1: %s", contatos[i]->numero[0]);
-    printf("TELEFONE 2: %s", contatos[i]->numero[1]);
-    printf("TELEFONE 3: %s", contatos[i]->numero[2]);
+    printf("NOME: %s SOBRENOME: %s\n", contatos[i]->nome, contatos[i]->sobrenome);
+    printf("E-MAILS:\nE-MAIL 1: %s\n", contatos[i]->email[0]);
+    printf("E-MAIL 2: %s\n", contatos[i]->email[1]);
+    printf("E-MAIL 3: %s\n", contatos[i]->email[2]);
+    printf("TELEFONES:\nTELEFONE 1: %s\n", contatos[i]->numero[0]);
+    printf("TELEFONE 2: %s\n", contatos[i]->numero[1]);
+    printf("TELEFONE 3: %s\n", contatos[i]->numero[2]);
     printf("---------------------------------------------\n");
 }
 
@@ -391,7 +393,6 @@ void listarContatosGUI(int indexes[]) {
     } else {
         contato404GUI();
     }
-    pressContinuar();
 }
 
 void buscarContatoNomeGUI() {
@@ -402,7 +403,12 @@ void buscarContatoNomeGUI() {
     fgets(nome, 256, stdin);
     printf("=============================================\n");
     strtok(nome, "\n");
-    listarContatosGUI(buscarContatoNome(nome));
+    int *indexes = buscarContatoNome(nome);
+    if (indexes[0] == -1) {
+        contato404GUI();
+    } else {
+        listarContatosGUI(indexes);
+    }
     pressContinuar();
 }
 
@@ -593,6 +599,9 @@ void menu() {
         switch(n) {
             case 1:
                 inserirContatoGUI();
+                break;
+            case 2:
+                buscarContatoNomeGUI();
                 break;
         }
     } while (n != 0);
