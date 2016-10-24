@@ -19,7 +19,7 @@ typedef struct {
  * Bootstrapping
  */
 
-Contato **contatos;
+Contato contatos[1000];
 int freeAtIndex = 0;
 
 /**
@@ -48,7 +48,7 @@ FILE *openDb(const char *path, const char *mode) {
 
 void freeIndex() {
     freeAtIndex++;
-    contatos[freeAtIndex] = malloc(sizeof(Contato));
+    contatos = (Contato *)realloc(contatos, sizeof(*contatos) + sizeof(Contato));
 }
 
 void emptyField(char *s) {
@@ -62,13 +62,13 @@ void emptyField(char *s) {
 void emptyFields() {
     int i = 0;
     while (i < freeAtIndex) {
-        emptyField(contatos[i]->sobrenome);
-        emptyField(contatos[i]->email[0]);
-        emptyField(contatos[i]->email[1]);
-        emptyField(contatos[i]->email[2]);
-        emptyField(contatos[i]->numero[0]);
-        emptyField(contatos[i]->numero[1]);
-        emptyField(contatos[i]->numero[2]);
+        emptyField(contatos[i].sobrenome);
+        emptyField(contatos[i].email[0]);
+        emptyField(contatos[i].email[1]);
+        emptyField(contatos[i].email[2]);
+        emptyField(contatos[i].numero[0]);
+        emptyField(contatos[i].numero[1]);
+        emptyField(contatos[i].numero[2]);
         i++;
     }
 }
@@ -79,14 +79,14 @@ void saveDataDb() {
     int i = 0;
     while (i < freeAtIndex) {
         int inserir = fprintf(db, "n: %s s: %s e1: %s e2: %s e3: %s n1: %s n2: %s n3: %s\n",
-            contatos[i]->nome,
-            contatos[i]->sobrenome,
-            contatos[i]->email[0],
-            contatos[i]->email[1],
-            contatos[i]->email[2],
-            contatos[i]->numero[0],
-            contatos[i]->numero[1],
-            contatos[i]->numero[2]);
+            contatos[i].nome,
+            contatos[i].sobrenome,
+            contatos[i].email[0],
+            contatos[i].email[1],
+            contatos[i].email[2],
+            contatos[i].numero[0],
+            contatos[i].numero[1],
+            contatos[i].numero[2]);
         if (inserir < 0) {
             erroGUI("Falha ao inserir o contato!");
             exit(1);
@@ -100,18 +100,17 @@ void loadDataDb() {
     FILE *db = openDb("db.txt", "loadData");
     rewind(db);
     int i = 0;
-    contatos[i] = malloc(sizeof(Contato));
     while (fscanf(db, "n: %s s: %s e1: %s e2: %s e3: %s n1: %s n2: %s n3: %s\n",
-        contatos[i]->nome,
-        contatos[i]->sobrenome,
-        contatos[i]->email[0],
-        contatos[i]->email[1],
-        contatos[i]->email[2],
-        contatos[i]->numero[0],
-        contatos[i]->numero[1],
-        contatos[i]->numero[2]) == 8) {
+        contatos[i].nome,
+        contatos[i].sobrenome,
+        contatos[i].email[0],
+        contatos[i].email[1],
+        contatos[i].email[2],
+        contatos[i].numero[0],
+        contatos[i].numero[1],
+        contatos[i].numero[2]) == 8) {
         i++;
-        contatos[i] = malloc(sizeof(Contato));
+        contatos = (Contato *)realloc(contatos, sizeof(*contatos) + sizeof(Contato));
         freeAtIndex++;
     }
     emptyFields();
@@ -173,16 +172,17 @@ int inserirContato(Contato c) {
     int i = 0;
     char *nomeCompletoAtIndex;
     while (i < freeAtIndex) {
-        nomeCompletoAtIndex = malloc(sizeof(contatos[i]->nome) + sizeof(contatos[i]->sobrenome) + sizeof(char));
-        strcpy(nomeCompletoAtIndex, contatos[i]->nome);
+        nomeCompletoAtIndex = malloc(sizeof(contatos[i].nome) + sizeof(contatos[i].sobrenome) + sizeof(char));
+        strcpy(nomeCompletoAtIndex, contatos[i].nome);
         strcat(nomeCompletoAtIndex, " ");
-        strcat(nomeCompletoAtIndex, contatos[i]->sobrenome);
+        strcat(nomeCompletoAtIndex, contatos[i].sobrenome);
         if (strcmp(nomeCompletoAtIndex, nomeCompleto) == 0) {
             erroGUI("Um contato com esse nome ja existe!");
             return 0;
         }
         i++;
     }
+    int i = 0;
 
     // validar emails
     for (i = 0; i < 3; i++) {
@@ -212,10 +212,10 @@ int inserirContato(Contato c) {
         }
     }
 
-    *contatos[freeAtIndex] = c;
+    contatos[freeAtIndex] = c;
     freeIndex();
 
-    if (strcmp(contatos[freeAtIndex-1]->nome, c.nome) != 0) {
+    if (strcmp(contatos[freeAtIndex-1].nome, c.nome) != 0) {
         erroGUI("Falha ao inserir o contato!");
         return 0;
     }
@@ -227,10 +227,10 @@ int *buscarContatoNome(const char *s) {
     indexes = malloc(sizeof(int));
     int i, j = 0, k = 0;
     for (i = 0; i < freeAtIndex; i++) {
-        if (strstr(contatos[i]->nome, s)) {
+        if (strstr(contatos[i].nome, s)) {
             indexes[j] = i;
             j++;
-            realloc(indexes, sizeof(*indexes) + sizeof(int));
+            indexes = (int *)realloc(indexes, sizeof(*indexes) + sizeof(int));
             k++;
         }
     }
@@ -363,13 +363,13 @@ void inserirContatoGUI() {
 
 void contatoGUI(const int i) {
     printf("---------------------------------------------\n");
-    printf("NOME: %s SOBRENOME: %s\n", contatos[i]->nome, contatos[i]->sobrenome);
-    printf("E-MAILS:\nE-MAIL 1: %s\n", contatos[i]->email[0]);
-    printf("E-MAIL 2: %s\n", contatos[i]->email[1]);
-    printf("E-MAIL 3: %s\n", contatos[i]->email[2]);
-    printf("TELEFONES:\nTELEFONE 1: %s\n", contatos[i]->numero[0]);
-    printf("TELEFONE 2: %s\n", contatos[i]->numero[1]);
-    printf("TELEFONE 3: %s\n", contatos[i]->numero[2]);
+    printf("NOME: %s SOBRENOME: %s\n", contatos[i].nome, contatos[i].sobrenome);
+    printf("E-MAILS:\nE-MAIL 1: %s\n", contatos[i].email[0]);
+    printf("E-MAIL 2: %s\n", contatos[i].email[1]);
+    printf("E-MAIL 3: %s\n", contatos[i].email[2]);
+    printf("TELEFONES:\nTELEFONE 1: %s\n", contatos[i].numero[0]);
+    printf("TELEFONE 2: %s\n", contatos[i].numero[1]);
+    printf("TELEFONE 3: %s\n", contatos[i].numero[2]);
     printf("---------------------------------------------\n");
 }
 
@@ -613,7 +613,7 @@ void menu() {
  */
 int main()
 {
-    contatos = malloc(sizeof(*contatos));
+    contatos = malloc(sizeof(Contato));
     loadDataDb();
     menu();
     saveDataDb();
