@@ -2,8 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
-
-#define MENUS_QUANTIDADE 1
+#include <ctype.h>
 
 /**
  * Models
@@ -17,17 +16,11 @@ typedef struct {
 } Contato;
 
 /**
- * Database connection
+ * Bootstrapping
  */
 
-FILE *db;
-
-void dbopen() {
-    if ((db = fopen("db.txt", "a")) == NULL) {
-        printf("\n\nErro ao abrir o banco de dados (db.txt).\n\n");
-        exit(1);
-    }
-}
+Contato **contatos;
+int freeAtIndex = 0;
 
 /**
  * Forward declarations
@@ -39,9 +32,129 @@ void erroGUI();
  * Business Logic
  */
 
-void pressContinuar() {
-    printf("PRESSIONE [ENTER] PARA CONTINUAR...");
-    getchar();
+FILE *openDb(const char *path, const char *mode) {
+    FILE *db = NULL;
+    if (strcmp(mode, "loadData") == 0) {
+        db = fopen(path, "a+");
+    } else if (strcmp(mode, "saveData") == 0) {
+        db = fopen(path, "w");
+    }
+    if (db == NULL) {
+        printf("Erro ao abrir o banco de dados (db.txt).\n");
+        exit(1);
+    }
+    return db;
+}
+
+void freeIndex() {
+    freeAtIndex++;
+    contatos[freeAtIndex] = malloc(sizeof(Contato));
+}
+
+void emptyField(char *s) {
+    if (strcmp(s, "") == 0) {
+        strcpy(s, "VAZIO");
+    } else if (strcmp(s, "VAZIO") == 0) {
+        strcpy(s, "");
+    }
+}
+
+void emptyFields() {
+    int i = 0;
+    while (i < freeAtIndex) {
+        emptyField(contatos[i]->sobrenome);
+        emptyField(contatos[i]->email[0]);
+        emptyField(contatos[i]->email[1]);
+        emptyField(contatos[i]->email[2]);
+        emptyField(contatos[i]->numero[0]);
+        emptyField(contatos[i]->numero[1]);
+        emptyField(contatos[i]->numero[2]);
+        i++;
+    }
+}
+
+void saveDataDb() {
+    FILE *db = openDb("db.txt", "saveData");
+    emptyFields();
+    int i = 0;
+    while (i < freeAtIndex) {
+        int inserir = fprintf(db, "n: %s s: %s e1: %s e2: %s e3: %s n1: %s n2: %s n3: %s\n",
+            contatos[i]->nome,
+            contatos[i]->sobrenome,
+            contatos[i]->email[0],
+            contatos[i]->email[1],
+            contatos[i]->email[2],
+            contatos[i]->numero[0],
+            contatos[i]->numero[1],
+            contatos[i]->numero[2]);
+        if (inserir < 0) {
+            erroGUI("Falha ao inserir o contato!");
+            exit(1);
+        }
+        i++;
+    }
+    fclose(db);
+}
+
+void loadDataDb() {
+    FILE *db = openDb("db.txt", "loadData");
+    rewind(db);
+    int i = 0;
+    contatos[i] = malloc(sizeof(Contato));
+    while (fscanf(db, "n: %s s: %s e1: %s e2: %s e3: %s n1: %s n2: %s n3: %s\n",
+        contatos[i]->nome,
+        contatos[i]->sobrenome,
+        contatos[i]->email[0],
+        contatos[i]->email[1],
+        contatos[i]->email[2],
+        contatos[i]->numero[0],
+        contatos[i]->numero[1],
+        contatos[i]->numero[2]) == 8) {
+        i++;
+        contatos[i] = malloc(sizeof(Contato));
+        freeAtIndex++;
+    }
+    emptyFields();
+    fclose(db);
+}
+
+int chrPos(const char *s, int c) {
+    int i = 0;
+    while (*(s+i) != '\0') {
+        if (*(s+i) == c) {
+            return i;
+        }
+        i++;
+    }
+    return -1;
+}
+
+int validMailUser(const char *s) {
+    int i = 0;
+    while (*(s+i) != '@') {
+        if (*(s+i) == '.') {
+            // ok
+        } else if (*(s+i) == '_') {
+            // ok
+        } else if (!isalnum(*(s+i))) {
+            return 0;
+        }
+        i++;
+    }
+    return 1;
+}
+
+int validDomain(const char *s) {
+    int i = 0;
+    while (*(s+i) != '\0') {
+        if (*(s+i) == '.') {
+            // ok
+        } else if (!isalnum(*(s+i))) {
+            return 0;
+        }
+        i++;
+    }
+    return 1;
 }
 
 int inserirContato(Contato c) {
@@ -51,31 +164,78 @@ int inserirContato(Contato c) {
         return 0;
     }
 
+    // validar exclusividade
+    char *nomeCompleto = malloc(sizeof(c.nome) + sizeof(c.sobrenome) + sizeof(char));
+    strcpy(nomeCompleto, c.nome);
+    strcat(nomeCompleto, " ");
+    strcat(nomeCompleto, c.sobrenome);
+
+    int i = 0;
+    while (i < freeAtIndex) {
+        char *nomeCompletoAtIndex = malloc(sizeof(contatos[i]->nome) + sizeof(contatos[i]->sobrenome) + sizeof(char));
+        strcpy(nomeCompletoAtIndex, contatos[i]->nome);
+        strcat(nomeCompletoAtIndex, " ");
+        strcat(nomeCompletoAtIndex, contatos[i]->sobrenome);
+        if (strcmp(nomeCompletoAtIndex, nomeCompleto) == 0) {
+            erroGUI("Um contato com esse nome ja existe!");
+            return 0;
+        }
+        free(nomeCompletoAtIndex);
+        i++;
+    }
+
+    free(nomeCompleto);
+
     // validar emails
-    int i;
     for (i = 0; i < 3; i++) {
         if (strcmp(c.email[i], "") != 0) {
-            if (strstr(c.email[i], "@") == NULL) {
-                erroGUI("E-mail invalido!");
+            char *at = strchr(c.email[i], '@');
+            // int atIndex = chrPos(c.email[i], '@');
+            if (at == NULL) {
+                erroGUI("E-mail invalido! #ERRMAILC000");
+                return 0;
+            }
+            if (*(at+1) == '\0') {
+                erroGUI("E-mail invalido! #ERRMAILC001");
+                return 0;
+            }
+            if (c.email[i][0] == '@') {
+                erroGUI("E-mail invalido! #ERRMAILC002");
+                return 0;
+            }
+            if (!validDomain(at+1)) {
+                erroGUI("E-mail invalido! #ERRMAILC003");
+                return 0;
+            }
+            if (!validMailUser(c.email[i])) {
+                erroGUI("E-mail invalido! #ERRMAILC004");
                 return 0;
             }
         }
     }
 
-    int inserir = fprintf(db, "n: %s s: %s e1: %s e2: %s e3: %s n1: %s n2: %s n3: %s\n",
-        c.nome,
-        c.sobrenome,
-        c.email[0],
-        c.email[1],
-        c.email[2],
-        c.numero[0],
-        c.numero[1],
-        c.numero[2]);
-    if (inserir < 0) {
+    *contatos[freeAtIndex] = c;
+    freeIndex();
+
+    if (strcmp(contatos[freeAtIndex-1]->nome, c.nome) != 0) {
         erroGUI("Falha ao inserir o contato!");
         return 0;
     }
     return 1;
+}
+
+int *buscarContatoNome(const char *s) {
+    static int *indexes;
+    indexes = malloc(sizeof(indexes));
+    int i, j = 0;
+    for (i = 0; i < freeAtIndex; i++) {
+        if (strstr(contatos[i]->nome, s)) {
+            &indexes[j] = (int *)malloc(sizeof(int));
+            indexes[j] = i;
+            j++;
+        }
+    }
+    return indexes;
 }
 
 /*int verificarMatricula(int m) {
@@ -152,32 +312,16 @@ int buscarEstudante(int m) {
         }
     }
     return 0;
-}
-
-int buscarEstudanteNome(char nome[]) {
-    int i, j = 0;
-    for (i = 0; i < ESTUDANTES; i++) {
-        if (strstr(estudantes[i].nome, nome)) {
-            exibirEstudanteGUI(estudantes[i].matricula);
-            j++;
-        }
-    }
-    if (j)
-        return 1;
-    return 0;
-}
-
-void removerNewLineStr(char s[]) {
-    int i;
-    for (i = 0; i < 256; i++)
-        if (s[i] == '\n')
-            break;
-    s[i] = '\0';
 }*/
 
 /**
  * Views
  */
+
+void pressContinuar() {
+    printf("PRESSIONE [ENTER] PARA CONTINUAR...");
+    getchar();
+}
 
 void erroGUI(char msg[]) {
     printf("---------------------------------------------\n");
@@ -215,6 +359,53 @@ void inserirContatoGUI() {
     pressContinuar();
 }
 
+void contatoGUI(const int i) {
+    printf("---------------------------------------------\n");
+    printf("NOME: %s SOBRENOME: %s", contatos[i]->nome, contatos[i]->sobrenome);
+    printf("E-MAILS:\nE-MAIL 1: %s", contatos[i]->email[0]);
+    printf("E-MAIL 2: %s", contatos[i]->email[1]);
+    printf("E-MAIL 3: %s", contatos[i]->email[2]);
+    printf("TELEFONES:\nTELEFONE 1: %s", contatos[i]->numero[0]);
+    printf("TELEFONE 2: %s", contatos[i]->numero[1]);
+    printf("TELEFONE 3: %s", contatos[i]->numero[2]);
+    printf("---------------------------------------------\n");
+}
+
+void contato404GUI() {
+    printf("---------------------------------------------\n");
+    printf("\tCONTATO NAO ENCONTRADO.\n");
+    printf("---------------------------------------------\n");
+}
+
+void listarContatosGUI(int indexes[]) {
+    printf("=============================================\n");
+    printf("\t\tLISTA DE CONTATOS\n");
+    printf("=============================================\n");
+    int indexesSize = sizeof(*indexes) / sizeof(int);
+    if (indexesSize > 0) {
+        int i = 0;
+        while (i < indexesSize) {
+            contatoGUI(indexes[i]);
+            i++;
+        }
+    } else {
+        contato404GUI();
+    }
+    pressContinuar();
+}
+
+void buscarContatoNomeGUI() {
+    printf("=============================================\n");
+    printf("\tENCONTRAR CONTATO PELO NOME\n");
+    printf("NOME DO CONTATO: ");
+    char nome[256];
+    fgets(nome, 256, stdin);
+    printf("=============================================\n");
+    strtok(nome, "\n");
+    listarContatosGUI(buscarContatoNome(nome));
+    pressContinuar();
+}
+
 /*void exibirEstudantesPorMediaDescGUI() {
     // todo: extract bussisness logic to function
     estudante eDesc[ESTUDANTES];
@@ -238,12 +429,6 @@ void inserirContatoGUI() {
             exibirEstudanteGUI(eDesc[i].matricula);
     printf("=============================================\n");
     pressContinuar();
-}
-
-void exibirEstudante404GUI() {
-    printf("---------------------------------------------\n");
-    printf("\tESTUDANTE NAO ENCONTRADO.\n");
-    printf("---------------------------------------------\n");
 }
 
 void exibirAtualizarEstudanteGUI() {
@@ -321,37 +506,6 @@ void exibirEncontrarEstudanteGUI() {
     printf("=============================================\n");
 }
 
-void exibirEncontrarEstudanteNomeGUI() {
-    printf("=============================================\n");
-    printf("\tENCONTRAR ESTUDANTE\n");
-    printf("NOME DO ESTUDANTE: ");
-    char nome[256];
-    fgets(nome, 256, stdin);
-    removerNewLineStr(nome);
-    if (!buscarEstudanteNome(nome)) {
-        exibirErroGUI();
-    }
-    pressContinuar();
-    printf("=============================================\n");
-}
-
-void exibirEstudanteGUI(int m) {
-    int iEstudante = verificarMatricula(m);
-    if (iEstudante != -1) {
-        printf("---------------------------------------------\n");
-        printf("NOME: %s", estudantes[iEstudante].nome);
-        printf("MATRICULA: %d\tSEXO: %c\n",
-            estudantes[iEstudante].matricula, estudantes[iEstudante].sexo);
-        float *notasProva = estudantes[iEstudante].notasProva;
-        printf("NOTAS DAS PROVAS:\nPROVA 1: %.1f\tPROVA 2: %.1f\tPROVA 3: %.1f\n", 
-            *(notasProva+0), *(notasProva+1), *(notasProva+2));
-        printf("NOTA DO PROJETO: %.1f\n", estudantes[iEstudante].notaProjeto);
-        printf("---------------------------------------------\n");
-    } else {
-        exibirEstudante404GUI();
-    }
-}
-
 void exibirMaiorMediaGUI() {
     int m = calcularMaiorMedia();
     if (m) {
@@ -413,11 +567,17 @@ void gui() {
     printf("=============================================\n");
     printf("\t\tMENU\n");
     printf("=============================================\n");
+    // para adicionar novos menus basta por mais uma string na array
+    // e chamar a func responsavel pelo menu na func menu()
     char menus[][200] = {
-        "Inserir contato"
+        "Inserir contato",
+        "Procurar por uma pessoa pelo nome",
+        "Procurar por uma pessoa pelo sobrenome",
+        "Procurar por uma pessoa pelo nome e sobrenome"
     };
     int i;
-    for (i = 0; i < MENUS_QUANTIDADE; i++) {
+    int quantidadeMenus = (sizeof(menus) / sizeof(menus[0]));
+    for (i = 0; i < quantidadeMenus; i++) {
         printf("%d. %s\n", i+1, menus[i]);
     }
     printf("0. Sair do programa e salvar alteracoes\n");
@@ -444,8 +604,9 @@ void menu() {
  */
 int main()
 {
-    dbopen();
+    contatos = malloc(sizeof(*contatos));
+    loadDataDb();
     menu();
-    fclose(db);
+    saveDataDb();
     return 0;
 }
