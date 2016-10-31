@@ -1,14 +1,13 @@
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
-#include <math.h>
+#include <string.h>
 #include <ctype.h>
 
 /**
  * Models
  */
 
-typedef struct {
+typedef struct contato {
     char nome[31];
     char sobrenome[31];
     char email[3][61];
@@ -19,8 +18,9 @@ typedef struct {
  * Bootstrapping
  */
 
-Contato contatos[1000];
-int freeAtIndex = 0;
+Contato *contatos;
+size_t contatosTamanho = (size_t)0;
+int contatos_t = 0;
 
 /**
  * Forward declarations
@@ -31,6 +31,18 @@ void erroGUI();
 /**
  * Business Logic
  */
+
+int compare_names(const void * a, const void * b) {
+  Contato *contatoA = (Contato *)a;
+  Contato *contatoB = (Contato *)b;
+  return strcmp(contatoA->nome, contatoB->nome);
+}
+
+void expandirContatos() {
+    contatosTamanho += sizeof(Contato);
+    contatos_t = (int)(contatosTamanho / sizeof(Contato));
+    contatos = realloc(contatos, contatosTamanho);
+}
 
 FILE *openDb(const char *path, const char *mode) {
     FILE *db = NULL;
@@ -46,11 +58,6 @@ FILE *openDb(const char *path, const char *mode) {
     return db;
 }
 
-void freeIndex() {
-    freeAtIndex++;
-    contatos = (Contato *)realloc(contatos, sizeof(*contatos) + sizeof(Contato));
-}
-
 void emptyField(char *s) {
     if (strcmp(s, "") == 0) {
         strcpy(s, "VAZIO");
@@ -61,7 +68,7 @@ void emptyField(char *s) {
 
 void emptyFields() {
     int i = 0;
-    while (i < freeAtIndex) {
+    while (i < contatos_t) {
         emptyField(contatos[i].sobrenome);
         emptyField(contatos[i].email[0]);
         emptyField(contatos[i].email[1]);
@@ -77,7 +84,7 @@ void saveDataDb() {
     FILE *db = openDb("db.txt", "saveData");
     emptyFields();
     int i = 0;
-    while (i < freeAtIndex) {
+    while (i < contatos_t) {
         int inserir = fprintf(db, "n: %s s: %s e1: %s e2: %s e3: %s n1: %s n2: %s n3: %s\n",
             contatos[i].nome,
             contatos[i].sobrenome,
@@ -98,34 +105,32 @@ void saveDataDb() {
 
 void loadDataDb() {
     FILE *db = openDb("db.txt", "loadData");
-    rewind(db);
     int i = 0;
+    char tNome[31], tSobrenome[31], tEmail[3][61], tNumero[3][20];
     while (fscanf(db, "n: %s s: %s e1: %s e2: %s e3: %s n1: %s n2: %s n3: %s\n",
-        contatos[i].nome,
-        contatos[i].sobrenome,
-        contatos[i].email[0],
-        contatos[i].email[1],
-        contatos[i].email[2],
-        contatos[i].numero[0],
-        contatos[i].numero[1],
-        contatos[i].numero[2]) == 8) {
+        tNome,
+        tSobrenome,
+        tEmail[0],
+        tEmail[1],
+        tEmail[2],
+        tNumero[0],
+        tNumero[0],
+        tNumero[0]) == 8) {
+
+        expandirContatos();
+        strcpy(contatos[i].nome, tNome);
+        strcpy(contatos[i].sobrenome, tSobrenome);
+        strcpy(contatos[i].email[0], tEmail[0]);
+        strcpy(contatos[i].email[1], tEmail[1]);
+        strcpy(contatos[i].email[2], tEmail[2]);
+        strcpy(contatos[i].numero[0], tNumero[0]);
+        strcpy(contatos[i].numero[1], tNumero[0]);
+        strcpy(contatos[i].numero[2], tNumero[0]);
+
         i++;
-        contatos = (Contato *)realloc(contatos, sizeof(*contatos) + sizeof(Contato));
-        freeAtIndex++;
     }
     emptyFields();
     fclose(db);
-}
-
-int chrPos(const char *s, int c) {
-    int i = 0;
-    while (*(s+i) != '\0') {
-        if (*(s+i) == c) {
-            return i;
-        }
-        i++;
-    }
-    return -1;
 }
 
 int validMailUser(const char *s) {
@@ -171,24 +176,27 @@ int inserirContato(Contato c) {
 
     int i = 0;
     char *nomeCompletoAtIndex;
-    while (i < freeAtIndex) {
+    while (i < contatos_t) {
         nomeCompletoAtIndex = malloc(sizeof(contatos[i].nome) + sizeof(contatos[i].sobrenome) + sizeof(char));
         strcpy(nomeCompletoAtIndex, contatos[i].nome);
         strcat(nomeCompletoAtIndex, " ");
         strcat(nomeCompletoAtIndex, contatos[i].sobrenome);
         if (strcmp(nomeCompletoAtIndex, nomeCompleto) == 0) {
             erroGUI("Um contato com esse nome ja existe!");
+            free(nomeCompletoAtIndex);
+            free(nomeCompleto);
             return 0;
         }
         i++;
+        free(nomeCompletoAtIndex);
     }
-    int i = 0;
+
+    free(nomeCompleto);
 
     // validar emails
     for (i = 0; i < 3; i++) {
         if (strcmp(c.email[i], "") != 0) {
             char *at = strchr(c.email[i], '@');
-            // int atIndex = chrPos(c.email[i], '@');
             if (at == NULL) {
                 erroGUI("E-mail invalido! #ERRMAILC000");
                 return 0;
@@ -212,109 +220,36 @@ int inserirContato(Contato c) {
         }
     }
 
-    contatos[freeAtIndex] = c;
-    freeIndex();
+    expandirContatos();
+    contatos[contatos_t-1] = c;
 
-    if (strcmp(contatos[freeAtIndex-1].nome, c.nome) != 0) {
+    if (strcmp(contatos[contatos_t-1].nome, c.nome) != 0) {
         erroGUI("Falha ao inserir o contato!");
         return 0;
     }
     return 1;
 }
 
-int *buscarContatoNome(const char *s) {
-    static int *indexes;
-    indexes = malloc(sizeof(int));
-    int i, j = 0, k = 0;
-    for (i = 0; i < freeAtIndex; i++) {
-        if (strstr(contatos[i].nome, s)) {
+// TODO: Binary search
+int *buscarContatoNome(const char *nome) {
+    // Ordena contatos em ordem alfabética
+    qsort(contatos, contatos_t, sizeof(Contato), compare_names);
+    size_t indexesSize = (size_t)0;
+    int *indexes = malloc(indexesSize);
+    int i, j = 0;
+    for (i = 0; i < contatos_t; i++) {
+        if (strcmp(nome, contatos[i].nome) == 0) {
+            indexesSize += sizeof(int);
+            indexes = realloc(indexes, indexesSize);
             indexes[j] = i;
             j++;
-            indexes = (int *)realloc(indexes, sizeof(*indexes) + sizeof(int));
-            k++;
         }
     }
-    if (k == 0) {
-        indexes[0] = -1;
-    }
+    indexesSize += sizeof(int);
+    indexes = realloc(indexes, indexesSize);
+    indexes[j] = -1;
     return indexes;
 }
-
-/*int verificarMatricula(int m) {
-    int i;
-    for (i = 0; i < ESTUDANTES; i++)
-        if (m == estudantes[i].matricula)
-            return i;
-    return -1;
-}
-
-int calcularMaiorMedia() {
-    float media = 0.0f;
-    int i, iEstudante;
-    for (i = 0; i < ESTUDANTES; i++) {
-        if (estudantes[i].media > media) {
-            media = estudantes[i].media;
-            iEstudante = i;
-        }
-    }
-    return estudantes[iEstudante].matricula;
-}
-
-int calcularMenorMedia() {
-    int iEstudante = verificarMatricula(calcularMaiorMedia());
-    if (iEstudante == -1) {
-        return 0;
-    } 
-    float media = estudantes[iEstudante].media;
-    int i, j;
-    for (i = 0; i < ESTUDANTES; i++) {
-        if (estudantes[i].media > 0 && estudantes[i].media < media) {
-            media = estudantes[i].media;
-            j = i;
-        }
-    }
-    return estudantes[j].matricula;
-}
-
-int indexLivre() {
-    int i;
-    for (i = 0; i < ESTUDANTES; i++) {
-        if (estudantes[i].matricula == 0)
-            break;
-    }
-    if ((i + 1) == ESTUDANTES)
-        return -1;
-    return i;
-}
-
-int adicionarEstudante(estudante e) {
-    int iEstudante = indexLivre();
-    if (iEstudante != -1) {
-        estudantes[iEstudante] = e;
-        return 1;
-    }
-    return 0;
-}
-
-int removerEstudante(int m) {
-    int iEstudante = verificarMatricula(m);
-    if (iEstudante != -1) {
-        estudantes[iEstudante].matricula = 0;
-        return 1;
-    }
-    return 0;
-}
-
-int buscarEstudante(int m) {
-    int i;
-    for (i = 0; i < ESTUDANTES; i++) {
-        if (estudantes[i].matricula == m) {
-            exibirEstudanteGUI(estudantes[i].matricula);
-            return 1;
-        }
-    }
-    return 0;
-}*/
 
 /**
  * Views
@@ -325,7 +260,7 @@ void pressContinuar() {
     getchar();
 }
 
-void erroGUI(char msg[]) {
+void erroGUI(const char *msg) {
     printf("---------------------------------------------\n");
     if (strcmp(msg, "") != 0) {
         printf("ERRO: %s\n", msg);
@@ -371,6 +306,8 @@ void contatoGUI(const int i) {
     printf("TELEFONE 2: %s\n", contatos[i].numero[1]);
     printf("TELEFONE 3: %s\n", contatos[i].numero[2]);
     printf("---------------------------------------------\n");
+    pressContinuar();
+    system("clear");
 }
 
 void contato404GUI() {
@@ -379,14 +316,14 @@ void contato404GUI() {
     printf("---------------------------------------------\n");
 }
 
-void listarContatosGUI(int indexes[]) {
+void listarContatosGUI(int *indexes) {
+    system("clear");
     printf("=============================================\n");
     printf("\t\tLISTA DE CONTATOS\n");
     printf("=============================================\n");
-    int indexesSize = sizeof(*indexes) / sizeof(int);
-    if (indexesSize > 0) {
+    if (indexes[0] >= 0) {
         int i = 0;
-        while (i < indexesSize) {
+        while (indexes[i] != -1) {
             contatoGUI(indexes[i]);
             i++;
         }
@@ -396,6 +333,7 @@ void listarContatosGUI(int indexes[]) {
 }
 
 void buscarContatoNomeGUI() {
+    system("clear");
     printf("=============================================\n");
     printf("\tENCONTRAR CONTATO PELO NOME\n");
     printf("NOME DO CONTATO: ");
@@ -410,163 +348,8 @@ void buscarContatoNomeGUI() {
         listarContatosGUI(indexes);
     }
     pressContinuar();
+    free(indexes);
 }
-
-/*void exibirEstudantesPorMediaDescGUI() {
-    // todo: extract bussisness logic to function
-    estudante eDesc[ESTUDANTES];
-    estudante e;
-    memcpy(&eDesc, &estudantes, sizeof(estudantes));
-    int i, j;
-    for (i = 0; i < ESTUDANTES; i++) {
-        for (j = i + 1; j < ESTUDANTES; j++) {
-            if (eDesc[i].media < eDesc[j].media) {
-                e = eDesc[i];
-                eDesc[i] = eDesc[j];
-                eDesc[j] = e;
-            }
-        }
-    }
-    printf("=============================================\n");
-    printf("ESTUDANTES ORDENADOS POR MEDIA\n");
-    printf("=============================================\n");
-    for (i = 0; i < ESTUDANTES; i++)
-        if (eDesc[i].matricula != 0)
-            exibirEstudanteGUI(eDesc[i].matricula);
-    printf("=============================================\n");
-    pressContinuar();
-}
-
-void exibirAtualizarEstudanteGUI() {
-    printf("=============================================\n");
-    printf("ATUALIZANDO ESTUDANTE:\n");
-    printf("NUMERO DA MATRICULA: ");
-    int m;
-    scanf("%d", &m);
-    getchar();
-    int iEstudante = verificarMatricula(m);
-    if (iEstudante != -1) {
-        printf("---------------------------------------------\n");
-        printf("Pressione apenas [ENTER] para não alterar um campo\n");
-        printf("---------------------------------------------\n");
-        printf("NOME (255 caracteres max): ");
-        char tempN[256];
-        if (*(fgets(tempN, 256, stdin)+0) != '\n')
-            strcpy(estudantes[iEstudante].nome, tempN);
-        printf("SEXO (M/F): ");
-        char tempS = fgetc(stdin);
-        if (tempS != '\n')
-            estudantes[iEstudante].sexo = tempS;
-        printf("---------------------------------------------\n");
-        printf("Informe o valor -1 para não alterar um campo\n");
-        printf("---------------------------------------------\n");
-        printf("NOTAS DAS PROVAS:\nPROVA 1: ");
-        float n;
-        scanf("%f", &n);
-        if (n != -1.0f)
-            estudantes[iEstudante].notasProva[0] = n;
-        printf("PROVA 2: ");
-        scanf("%f", &n);
-        if (n != -1.0f)
-            estudantes[iEstudante].notasProva[1] = n;
-        printf("PROVA 3: ");
-        scanf("%f", &n);
-        if (n != -1.0f)
-            estudantes[iEstudante].notasProva[2] = n;
-        // atualizar media
-        estudantes[iEstudante].media = (estudantes[iEstudante].notasProva[0] + estudantes[iEstudante].notasProva[1] +
-            estudantes[iEstudante].notasProva[2]) / 3;
-        printf("NOTA DO PROJETO: ");
-        scanf("%f", &n);
-        if (n != -1.0f)
-            estudantes[iEstudante].notaProjeto = n;
-    } else {
-        exibirErroGUI();
-    }
-    printf("=============================================\n");
-}
-
-void exibirApagarEstudanteGUI() {
-    printf("=============================================\n");
-    printf("\tAPAGAR ESTUDANTE\n");
-    printf("MATRICULA DO ESTUDANTE A SER APAGADO: ");
-    int m;
-    scanf("%d", &m);
-    printf("=============================================\n");
-    if (!removerEstudante(m)) {
-        exibirErroGUI();
-    }
-    pressContinuar();
-}
-
-void exibirEncontrarEstudanteGUI() {
-    printf("=============================================\n");
-    printf("\tENCONTRAR ESTUDANTE\n");
-    printf("MATRICULA DO ESTUDANTE: ");
-    int m;
-    scanf("%d", &m);
-    if (!buscarEstudante(m)) {
-        exibirErroGUI();
-    }
-    pressContinuar();
-    printf("=============================================\n");
-}
-
-void exibirMaiorMediaGUI() {
-    int m = calcularMaiorMedia();
-    if (m) {
-        printf("=============================================\n");
-        printf("O ESTUDANTE COM MAIOR MEDIA E:\n");
-        exibirEstudanteGUI(m);
-        printf("=============================================\n");
-    } else {
-        exibirEstudante404GUI();
-    }
-    pressContinuar();
-}
-
-void exibirMenorMediaGUI() {
-    int m = calcularMenorMedia();
-    if (m) {
-        printf("=============================================\n");
-        printf("O ESTUDANTE COM MENOR MEDIA E:\n");
-        exibirEstudanteGUI(m);
-        printf("=============================================\n");
-    } else {
-        exibirEstudante404GUI();
-    }
-    pressContinuar();
-}
-
-void exibirMediaEstudanteGUI() {
-    printf("=============================================\n");
-    printf("\tMEDIA ESTUDANTE\n");
-    printf("NUMERO DA MATRICULA: ");
-    int m;
-    scanf("%d", &m);
-    int iEstudante = verificarMatricula(m);
-    if (iEstudante != -1) {
-        printf("A media do estudante %s e: %.1f\n",
-            estudantes[iEstudante].nome, estudantes[iEstudante].media);
-        printf("=============================================\n");
-    } else {
-        exibirEstudante404GUI();
-    }
-    pressContinuar();
-}
-
-void exibirListaEstudantesGUI() {
-    printf("=============================================\n");
-    printf("\t\tLISTA DE ESTUDANTES\n");
-    printf("=============================================\n");
-    int i;
-    for (i = 0; i < ESTUDANTES; i++) {
-        if (estudantes[i].matricula == 0)
-            continue;
-        exibirEstudanteGUI(estudantes[i].matricula);
-    }
-    pressContinuar();
-}*/
 
 void gui() {
     system("clear");
@@ -577,9 +360,7 @@ void gui() {
     // e chamar a func responsavel pelo menu na func menu()
     char menus[][200] = {
         "Inserir contato",
-        "Procurar por uma pessoa pelo nome",
-        "Procurar por uma pessoa pelo sobrenome",
-        "Procurar por uma pessoa pelo nome e sobrenome"
+        "Buscar contato pelo nome"
     };
     int i;
     int quantidadeMenus = (sizeof(menus) / sizeof(menus[0]));
@@ -613,9 +394,10 @@ void menu() {
  */
 int main()
 {
-    contatos = malloc(sizeof(Contato));
+    contatos = malloc(contatosTamanho);
     loadDataDb();
     menu();
     saveDataDb();
+    free(contatos);
     return 0;
 }
