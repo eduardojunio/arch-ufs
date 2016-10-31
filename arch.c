@@ -306,8 +306,6 @@ void contatoGUI(const int i) {
     printf("TELEFONE 2: %s\n", contatos[i].numero[1]);
     printf("TELEFONE 3: %s\n", contatos[i].numero[2]);
     printf("---------------------------------------------\n");
-    pressContinuar();
-    system("clear");
 }
 
 void contato404GUI() {
@@ -325,6 +323,41 @@ void listarContatosGUI(int *indexes) {
         int i = 0;
         while (indexes[i] != -1) {
             contatoGUI(indexes[i]);
+            pressContinuar();
+            system("clear");
+            i++;
+        }
+    } else {
+        contato404GUI();
+    }
+}
+
+void listarContatosRemoverGUI(int *indexes) {
+    system("clear");
+    printf("=============================================\n");
+    printf("\tLISTA DE CONTATOS A SEREM REMOVIDOS\n");
+    printf("=============================================\n");
+    if (indexes[0] >= 0) {
+        int i = 0;
+        while (indexes[i] != -1) {
+            contatoGUI(indexes[i]);
+            // EM QUALQUER CLI QUE VOCÊ FOR USAR NA SUA VIDA, A OPÇÃO RECOMENDADA
+            // FICA EM MAIUSCULO E A NÃO RECOMENDADA EM MINUSLO
+            // PS.: REGRA NÃO ESCRITA DA VIDA.
+            // NÃO MECHER NO CÓDIGO ABAIXO!!!!!!!!
+            printf("Deseja remover esse contato? (s/N) ");
+            char a;
+            a = getchar();
+            if (a == 's' || a == 'S') {
+                // TODO: call removeContact function
+                puts("CONTATO REMOVIDO!");
+                getchar();
+                pressContinuar();
+            } else {
+                getchar();
+                pressContinuar();
+                system("clear");
+            }
             i++;
         }
     } else {
@@ -351,6 +384,24 @@ void buscarContatoNomeGUI() {
     free(indexes);
 }
 
+void removerContatoGUI() {
+    system("clear");
+    printf("=============================================\n");
+    printf("\tREMOVER CONTATO PELO NOME\n");
+    printf("NOME DO CONTATO: ");
+    char nome[256];
+    fgets(nome, 256, stdin);
+    printf("=============================================\n");
+    strtok(nome, "\n");
+    int *indexes = buscarContatoNome(nome);
+    if (indexes[0] == -1) {
+        contato404GUI();
+    } else {
+        listarContatosRemoverGUI(indexes);
+    }
+    free(indexes);
+}
+
 void gui() {
     system("clear");
     printf("=============================================\n");
@@ -360,7 +411,8 @@ void gui() {
     // e chamar a func responsavel pelo menu na func menu()
     char menus[][200] = {
         "Inserir contato",
-        "Buscar contato pelo nome"
+        "Buscar contato pelo nome",
+        "Remover contato"
     };
     int i;
     int quantidadeMenus = (sizeof(menus) / sizeof(menus[0]));
@@ -383,6 +435,9 @@ void menu() {
                 break;
             case 2:
                 buscarContatoNomeGUI();
+                break;
+            case 3:
+                removerContatoGUI();
                 break;
         }
     } while (n != 0);
