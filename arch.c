@@ -83,6 +83,8 @@ void emptyFields() {
 void saveDataDb() {
     FILE *db = openDb("db.txt", "saveData");
     emptyFields();
+    // Ordena contatos em ordem alfabética
+    qsort(contatos, contatos_t, sizeof(Contato), compare_names);
     int i = 0;
     while (i < contatos_t) {
         int inserir = fprintf(db, "n: %s s: %s e1: %s e2: %s e3: %s n1: %s n2: %s n3: %s\n",
@@ -232,13 +234,11 @@ int inserirContato(Contato c) {
 
 // TODO: Binary search
 int *buscarContatoNome(const char *nome) {
-    // Ordena contatos em ordem alfabética
-    qsort(contatos, contatos_t, sizeof(Contato), compare_names);
     size_t indexesSize = (size_t)0;
     int *indexes = malloc(indexesSize);
     int i, j = 0;
     for (i = 0; i < contatos_t; i++) {
-        if (strcmp(nome, contatos[i].nome) == 0) {
+        if (strstr(contatos[i].nome, nome)) {
             indexesSize += sizeof(int);
             indexes = realloc(indexes, indexesSize);
             indexes[j] = i;
