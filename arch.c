@@ -1,3 +1,14 @@
+/**
+ * ARCH UFS
+ * Projeto de Programação Imperativa
+ * Agenda de contatos
+ * 
+ * Integrantes:
+ * - RIVANILDO JUNIOR DOS SANTOS ANDRADE
+ * - VITOR FERNANDO ARAUJO MENEZES
+ * - EDUARDO JUNIO SANTOS MACEDO
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,12 +43,16 @@ void erroGUI();
  * Business Logic
  */
 
-int compare_names(const void * a, const void * b) {
+int ordem_alfabetica(const void * a, const void * b) {
   Contato *contatoA = (Contato *)a;
   Contato *contatoB = (Contato *)b;
   return strcmp(contatoA->nome, contatoB->nome);
 }
 
+/**
+ * Expande a array global usada para armazenar os contatos na memória
+ * para caber mais um contato
+ */
 void expandirContatos() {
     contatosTamanho += sizeof(Contato);
     contatos_t = (int)(contatosTamanho / sizeof(Contato));
@@ -84,7 +99,7 @@ void saveDataDb() {
     FILE *db = openDb("db.txt", "saveData");
     emptyFields();
     // Ordena contatos em ordem alfabética
-    qsort(contatos, contatos_t, sizeof(Contato), compare_names);
+    qsort(contatos, contatos_t, sizeof(Contato), ordem_alfabetica);
     int i = 0;
     while (i < contatos_t) {
         int inserir = fprintf(db, "n: %s s: %s e1: %s e2: %s e3: %s n1: %s n2: %s n3: %s\n",
@@ -118,7 +133,6 @@ void loadDataDb() {
         tNumero[0],
         tNumero[0],
         tNumero[0]) == 8) {
-
         expandirContatos();
         strcpy(contatos[i].nome, tNome);
         strcpy(contatos[i].sobrenome, tSobrenome);
@@ -128,7 +142,6 @@ void loadDataDb() {
         strcpy(contatos[i].numero[0], tNumero[0]);
         strcpy(contatos[i].numero[1], tNumero[0]);
         strcpy(contatos[i].numero[2], tNumero[0]);
-
         i++;
     }
     emptyFields();
@@ -156,6 +169,22 @@ int validDomain(const char *s) {
         if (*(s+i) == '.') {
             // ok
         } else if (!isalnum(*(s+i))) {
+            return 0;
+        }
+        i++;
+    }
+    return 1;
+}
+
+int validNumber(const char *s) {
+    int i = 0;
+    while (s[i] != '\0') {
+        if (isdigit(s[i]) || s[i] == ' ' ||
+            s[i] == '(' || s[i] == ')') {
+            // ok
+        } else if (i == 0 && s[i] == '+') {
+            // ok
+        } else {
             return 0;
         }
         i++;
@@ -197,7 +226,7 @@ int inserirContato(Contato c) {
 
     // validar emails
     for (i = 0; i < 3; i++) {
-        if (strcmp(c.email[i], "") != 0) {
+        if (strcmp(c.email[i], "") != 0 && strcmp(c.email[i], "\n") != 0) {
             char *at = strchr(c.email[i], '@');
             if (at == NULL) {
                 erroGUI("E-mail invalido! #ERRMAILC000");
@@ -222,6 +251,16 @@ int inserirContato(Contato c) {
         }
     }
 
+    // validar numeros
+    for (i = 0; i < 3; i++) {
+        if (strcmp(c.numero[i], "") != 0 && strcmp(c.numero[i], "\n") != 0) {
+            if (!validNumber(c.numero[i])) {
+                erroGUI("Numero invalido! Exemplo: (81) 98845 7687");
+                return 0;
+            }
+        }
+    }
+
     expandirContatos();
     contatos[contatos_t-1] = c;
 
@@ -232,7 +271,6 @@ int inserirContato(Contato c) {
     return 1;
 }
 
-// TODO: Binary search
 int *buscarContatoNome(const char *nome) {
     size_t indexesSize = (size_t)0;
     int *indexes = malloc(indexesSize);
@@ -249,6 +287,47 @@ int *buscarContatoNome(const char *nome) {
     indexes = realloc(indexes, indexesSize);
     indexes[j] = -1;
     return indexes;
+}
+
+int *buscarIndexesContato(int index) {
+    int *indexes = malloc(2 * sizeof(int));
+    // index do ultimo nome
+    int i;
+    for (i = index; strstr(contatos[i].nome, contatos[index].nome) != NULL; i++) {
+        // ok
+    }
+    // index do primeiro nome
+    int j;
+    for (j = index; strstr(contatos[j].nome, contatos[index].nome) != NULL; j--) {
+        // ok
+    }
+    indexes[0] = j + 1;
+    indexes[1] = i - 1;
+    return indexes;
+}
+
+int buscarContatoNomeBinario(const char *nome) {
+    int esquerda = 0, direita = contatos_t - 1, meio;
+    do {
+        if (esquerda > direita) {
+            return -1;
+        }
+        meio = (esquerda + direita) / 2;
+        if (strcmp(contatos[meio].nome, nome) < 0) {
+            esquerda = meio + 1;
+        } else if (strcmp(contatos[meio].nome, nome) > 0) {
+            direita = meio - 1;
+        }
+    } while (strstr(contatos[meio].nome, nome) == NULL);
+    return meio;
+}
+
+void removerNovaLinha(char *s) {
+    int i = 0;
+    while (s[i] != '\n') {
+        i++;
+    }
+    s[i] = '\0';
 }
 
 /**
@@ -273,52 +352,60 @@ void erroGUI(const char *msg) {
 void inserirContatoGUI() {
     Contato c;
     system("clear");
-    printf("=============================================\n");
+    puts("=============================================");
     printf("INSERIR CONTATO:\n");
     printf("NOME (30 caracteres max): ");
-    gets(c.nome);
+    fgets(c.nome, 31, stdin);
+    removerNovaLinha(c.nome);
     printf("SOBRENOME (30 caracteres max): ");
-    gets(c.sobrenome);
+    fgets(c.sobrenome, 31, stdin);
+    removerNovaLinha(c.sobrenome);
     printf("E-MAILS:\nE-MAIL 1: ");
-    gets(c.email[0]);
+    fgets(c.email[0], 61, stdin);
+    removerNovaLinha(c.email[0]);
     printf("E-MAIL 2: ");
-    gets(c.email[1]);
+    fgets(c.email[1], 61, stdin);
+    removerNovaLinha(c.email[1]);
     printf("E-MAIL 3: ");
-    gets(c.email[2]);
+    fgets(c.email[2], 61, stdin);
+    removerNovaLinha(c.email[2]);
     printf("TELEFONES:\nTELEFONE 1: ");
-    gets(c.numero[0]);
+    fgets(c.numero[0], 20, stdin);
+    removerNovaLinha(c.numero[0]);
     printf("TELEFONE 2: ");
-    gets(c.numero[1]);
+    fgets(c.numero[1], 20, stdin);
+    removerNovaLinha(c.numero[1]);
     printf("TELEFONE 3: ");
-    gets(c.numero[2]);
-    printf("=============================================\n");
+    fgets(c.numero[2], 20, stdin);
+    removerNovaLinha(c.numero[2]);
+    puts("=============================================");
     inserirContato(c);
     pressContinuar();
 }
 
 void contatoGUI(const int i) {
-    printf("---------------------------------------------\n");
-    printf("NOME: %s SOBRENOME: %s\n", contatos[i].nome, contatos[i].sobrenome);
+    puts("---------------------------------------------");
+    printf("NOME: %s SOBRENOME: %s\n\n", contatos[i].nome, contatos[i].sobrenome);
     printf("E-MAILS:\nE-MAIL 1: %s\n", contatos[i].email[0]);
     printf("E-MAIL 2: %s\n", contatos[i].email[1]);
-    printf("E-MAIL 3: %s\n", contatos[i].email[2]);
+    printf("E-MAIL 3: %s\n\n", contatos[i].email[2]);
     printf("TELEFONES:\nTELEFONE 1: %s\n", contatos[i].numero[0]);
     printf("TELEFONE 2: %s\n", contatos[i].numero[1]);
     printf("TELEFONE 3: %s\n", contatos[i].numero[2]);
-    printf("---------------------------------------------\n");
+    puts("---------------------------------------------");
 }
 
 void contato404GUI() {
-    printf("---------------------------------------------\n");
-    printf("\tCONTATO NAO ENCONTRADO.\n");
-    printf("---------------------------------------------\n");
+    puts("---------------------------------------------");
+    puts("CONTATO NAO ENCONTRADO.");
+    puts("---------------------------------------------");
 }
 
 void listarContatosGUI(int *indexes) {
     system("clear");
-    printf("=============================================\n");
-    printf("\t\tLISTA DE CONTATOS\n");
-    printf("=============================================\n");
+    puts("=============================================");
+    puts("LISTA DE CONTATOS");
+    puts("=============================================");
     if (indexes[0] >= 0) {
         int i = 0;
         while (indexes[i] != -1) {
@@ -332,6 +419,10 @@ void listarContatosGUI(int *indexes) {
     }
 }
 
+/**
+ * @param integer array with the first and the last
+ * found index
+ */
 void listarContatosRemoverGUI(int *indexes) {
     system("clear");
     printf("=============================================\n");
@@ -348,13 +439,12 @@ void listarContatosRemoverGUI(int *indexes) {
             printf("Deseja remover esse contato? (s/N) ");
             char a;
             a = getchar();
+            getchar(); // remove newline from buffer
             if (a == 's' || a == 'S') {
                 // TODO: call removeContact function
                 puts("CONTATO REMOVIDO!");
-                getchar();
                 pressContinuar();
             } else {
-                getchar();
                 pressContinuar();
                 system("clear");
             }
@@ -367,20 +457,20 @@ void listarContatosRemoverGUI(int *indexes) {
 
 void buscarContatoNomeGUI() {
     system("clear");
-    printf("=============================================\n");
-    printf("\tENCONTRAR CONTATO PELO NOME\n");
+    puts("=============================================");
+    puts("ENCONTRAR CONTATO PELO NOME");
+    puts("=============================================");
     printf("NOME DO CONTATO: ");
     char nome[256];
     fgets(nome, 256, stdin);
-    printf("=============================================\n");
-    strtok(nome, "\n");
+    removerNovaLinha(nome);
     int *indexes = buscarContatoNome(nome);
     if (indexes[0] == -1) {
         contato404GUI();
+        pressContinuar();
     } else {
         listarContatosGUI(indexes);
     }
-    pressContinuar();
     free(indexes);
 }
 
@@ -391,8 +481,8 @@ void removerContatoGUI() {
     printf("NOME DO CONTATO: ");
     char nome[256];
     fgets(nome, 256, stdin);
+    removerNovaLinha(nome);
     printf("=============================================\n");
-    strtok(nome, "\n");
     int *indexes = buscarContatoNome(nome);
     if (indexes[0] == -1) {
         contato404GUI();
