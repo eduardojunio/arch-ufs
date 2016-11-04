@@ -307,6 +307,7 @@ int *buscarIndexesContato(int index) {
 }
 
 int buscarContatoNomeBinario(const char *nome) {
+    qsort(contatos, contatos_t, sizeof(Contato), ordem_alfabetica);
     int esquerda = 0, direita = contatos_t - 1, meio;
     do {
         if (esquerda > direita) {
@@ -483,7 +484,7 @@ void removerContatoGUI() {
     fgets(nome, 256, stdin);
     removerNovaLinha(nome);
     printf("=============================================\n");
-    int *indexes = buscarContatoNome(nome);
+    int *indexes = buscarIndexesContato(buscarContatoNomeBinario(nome));
     if (indexes[0] == -1) {
         contato404GUI();
     } else {
