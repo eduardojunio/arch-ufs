@@ -1,10 +1,10 @@
 /**
  * ARCH UFS
- * Projeto de ProgramaÃ§Ã£o Imperativa
+ * Projeto de Programação Imperativa
  * Agenda de contatos
- * 
+ *
  * Integrantes:
- * - RIVANILDO JUNIOR DOS SANTOS ANDRADE
+ * - RIVANILDO JÚNIOR DOS SANTOS ANDRADE
  * - VITOR FERNANDO ARAUJO MENEZES
  * - EDUARDO JUNIO SANTOS MACEDO
  */
@@ -50,11 +50,21 @@ int ordem_alfabetica(const void * a, const void * b) {
 }
 
 /**
- * Expande a array global usada para armazenar os contatos na memÃ³ria
+ * Expande a array global usada para armazenar os contatos na memória
  * para caber mais um contato
  */
 void expandirContatos() {
     contatosTamanho += sizeof(Contato);
+    contatos_t = (int)(contatosTamanho / sizeof(Contato));
+    contatos = realloc(contatos, contatosTamanho);
+}
+
+/**
+ * Encolhe a array global usada para armazenar os contatos na memória
+ * em um contato
+ */
+void encolherContatos() {
+    contatosTamanho -= sizeof(Contato);
     contatos_t = (int)(contatosTamanho / sizeof(Contato));
     contatos = realloc(contatos, contatosTamanho);
 }
@@ -98,7 +108,7 @@ void emptyFields() {
 void saveDataDb() {
     FILE *db = openDb("db.txt", "saveData");
     emptyFields();
-    // Ordena contatos em ordem alfabÃ©tica
+    // Ordena contatos em ordem alfabética
     qsort(contatos, contatos_t, sizeof(Contato), ordem_alfabetica);
     int i = 0;
     while (i < contatos_t) {
@@ -291,6 +301,11 @@ int *buscarContatoNome(const char *nome) {
 
 int *buscarIndexesContato(int index) {
     int *indexes = malloc(2 * sizeof(int));
+    if (index < 0) {
+        indexes[0] = -1;
+        indexes[1] = -1;
+        return indexes;
+    }
     // index do ultimo nome
     int i;
     for (i = index; strstr(contatos[i].nome, contatos[index].nome) != NULL; i++) {
@@ -352,7 +367,7 @@ void erroGUI(const char *msg) {
 
 void inserirContatoGUI() {
     Contato c;
-    system("clear");
+    system("cls");
     puts("=============================================");
     printf("INSERIR CONTATO:\n");
     printf("NOME (30 caracteres max): ");
@@ -402,19 +417,45 @@ void contato404GUI() {
     puts("---------------------------------------------");
 }
 
+void navegarAgendaGUI(int index) {
+    system("cls");
+    contatoGUI(index);
+    int escolha;
+    do {
+        printf("1.(Anterior) \t\t 3.(Sair) \t\t 2.(Proximo)\n");
+        printf("Pressione (1) para Anterior, (2) para Proximo e (3) para Sair\n: ");
+        scanf("%d", &escolha);
+
+        switch(escolha) {
+            case 1:
+                system("cls");
+                if(index == 0){
+                    contatoGUI(index);
+                } else {
+                    index--;
+                    contatoGUI(index);
+                }
+                break;
+            case 2:
+                system("cls");
+                if(index == (contatos_t - 1)){
+                    contatoGUI(index);
+                } else {
+                    index++;
+                    contatoGUI(index);
+                }
+                break;
+        }
+    } while(escolha != 3);
+}
+
 void listarContatosGUI(int *indexes) {
-    system("clear");
+    system("cls");
     puts("=============================================");
     puts("LISTA DE CONTATOS");
     puts("=============================================");
     if (indexes[0] >= 0) {
-        int i = 0;
-        while (indexes[i] != -1) {
-            contatoGUI(indexes[i]);
-            pressContinuar();
-            system("clear");
-            i++;
-        }
+        navegarAgendaGUI(indexes[0]);
     } else {
         contato404GUI();
     }
@@ -425,39 +466,20 @@ void listarContatosGUI(int *indexes) {
  * found index
  */
 void listarContatosRemoverGUI(int *indexes) {
-    system("clear");
-    printf("=============================================\n");
-    printf("\tLISTA DE CONTATOS A SEREM REMOVIDOS\n");
-    printf("=============================================\n");
+    system("cls");
+    puts("=============================================");
+    puts("LISTA DE CONTATOS A SEREM REMOVIDOS");
+    puts("=============================================");
     if (indexes[0] >= 0) {
-        int i = 0;
-        while (indexes[i] != -1) {
-            contatoGUI(indexes[i]);
-            // EM QUALQUER CLI QUE VOCÃŠ FOR USAR NA SUA VIDA, A OPÃ‡ÃƒO RECOMENDADA
-            // FICA EM MAIUSCULO E A NÃƒO RECOMENDADA EM MINUSLO
-            // PS.: REGRA NÃƒO ESCRITA DA VIDA.
-            // NÃƒO MECHER NO CÃ“DIGO ABAIXO!!!!!!!!
-            printf("Deseja remover esse contato? (s/N) ");
-            char a;
-            a = getchar();
-            getchar(); // remove newline from buffer
-            if (a == 's' || a == 'S') {
-                // TODO: call removeContact function
-                puts("CONTATO REMOVIDO!");
-                pressContinuar();
-            } else {
-                pressContinuar();
-                system("clear");
-            }
-            i++;
-        }
+        // versão remover da navegar aqui
+        // pode deixar que eu faço essa parte
     } else {
         contato404GUI();
     }
 }
 
 void buscarContatoNomeGUI() {
-    system("clear");
+    system("cls");
     puts("=============================================");
     puts("ENCONTRAR CONTATO PELO NOME");
     puts("=============================================");
@@ -465,7 +487,7 @@ void buscarContatoNomeGUI() {
     char nome[256];
     fgets(nome, 256, stdin);
     removerNovaLinha(nome);
-    int *indexes = buscarContatoNome(nome);
+    int *indexes = buscarIndexesContato(buscarContatoNomeBinario(nome));
     if (indexes[0] == -1) {
         contato404GUI();
         pressContinuar();
@@ -476,14 +498,14 @@ void buscarContatoNomeGUI() {
 }
 
 void removerContatoGUI() {
-    system("clear");
-    printf("=============================================\n");
-    printf("\tREMOVER CONTATO PELO NOME\n");
+    system("cls");
+    puts("=============================================");
+    puts("REMOVER CONTATO PELO NOME");
     printf("NOME DO CONTATO: ");
-    char nome[256];
-    fgets(nome, 256, stdin);
+    char nome[31];
+    fgets(nome, 31, stdin);
     removerNovaLinha(nome);
-    printf("=============================================\n");
+    puts("=============================================");
     int *indexes = buscarIndexesContato(buscarContatoNomeBinario(nome));
     if (indexes[0] == -1) {
         contato404GUI();
@@ -494,7 +516,7 @@ void removerContatoGUI() {
 }
 
 void gui() {
-    system("clear");
+    system("cls");
     printf("=============================================\n");
     printf("\t\tMENU\n");
     printf("=============================================\n");
