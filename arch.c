@@ -30,7 +30,7 @@ typedef struct contato {
  */
 
 Contato *contatos;
-size_t contatosTamanho = (size_t)0;
+size_t contatosTamanho = 0;
 int contatos_t = 0;
 
 /**
@@ -281,24 +281,6 @@ int inserirContato(Contato c) {
     return 1;
 }
 
-int *buscarContatoNome(const char *nome) {
-    size_t indexesSize = (size_t)0;
-    int *indexes = malloc(indexesSize);
-    int i, j = 0;
-    for (i = 0; i < contatos_t; i++) {
-        if (strstr(contatos[i].nome, nome)) {
-            indexesSize += sizeof(int);
-            indexes = realloc(indexes, indexesSize);
-            indexes[j] = i;
-            j++;
-        }
-    }
-    indexesSize += sizeof(int);
-    indexes = realloc(indexes, indexesSize);
-    indexes[j] = -1;
-    return indexes;
-}
-
 int *buscarIndexesContato(int index) {
     int *indexes = malloc(2 * sizeof(int));
     if (index < 0) {
@@ -307,17 +289,25 @@ int *buscarIndexesContato(int index) {
         return indexes;
     }
     // index do ultimo nome
-    int i;
-    for (i = index; strstr(contatos[i].nome, contatos[index].nome) != NULL; i++) {
-        // ok
+    int i = index;
+    while (strstr(contatos[i].nome, contatos[index].nome) != NULL) {
+        if ((i + 1) < contatos_t) {
+            i++;
+        } else {
+            break;
+        }
     }
     // index do primeiro nome
-    int j;
-    for (j = index; strstr(contatos[j].nome, contatos[index].nome) != NULL; j--) {
-        // ok
+    int j = index;
+    while (strstr(contatos[j].nome, contatos[index].nome) != NULL) {
+        if ((j - 1) >= 0) {
+            j--;
+        } else {
+            break;
+        }
     }
-    indexes[0] = j + 1;
-    indexes[1] = i - 1;
+    indexes[0] = j;
+    indexes[1] = i;
     return indexes;
 }
 
@@ -336,6 +326,20 @@ int buscarContatoNomeBinario(const char *nome) {
         }
     } while (strstr(contatos[meio].nome, nome) == NULL);
     return meio;
+}
+
+int removerContato(int index) {
+    if (index < 0) {
+        return 0;
+    }
+    int i;
+    for (i = index; i < contatos_t; i++) {
+        if ((i + 1) < contatos_t) {
+            contatos[i] = contatos[i + 1];
+        }
+    }
+    encolherContatos();
+    return 1;
 }
 
 void removerNovaLinha(char *s) {
@@ -418,12 +422,11 @@ void contato404GUI() {
 }
 
 void navegarAgendaGUI(int index) {
-    system("cls");
     contatoGUI(index);
     int escolha;
     do {
-        printf("1.(Anterior) \t\t 3.(Sair) \t\t 2.(Proximo)\n");
-        printf("Pressione (1) para Anterior, (2) para Proximo e (3) para Sair\n: ");
+        puts("1. ANTERIOR | 2. PROXIMO | 3. REMOVER | 4. SAIR");
+        printf("DIGITE SUA OPCAO: ");
         scanf("%d", &escolha);
 
         switch(escolha) {
@@ -445,8 +448,18 @@ void navegarAgendaGUI(int index) {
                     contatoGUI(index);
                 }
                 break;
+            case 3:
+                if (removerContato(index)) {
+                    puts("CONTATO REMOVIDO COM SUCESSO!");
+                    getchar();
+                    pressContinuar();
+                    escolha = 4;
+                } else {
+                    erroGUI("Nao foi possivel remover o contato!");
+                }
+                break;
         }
-    } while(escolha != 3);
+    } while(escolha != 4);
 }
 
 void listarContatosGUI(int *indexes) {
@@ -458,6 +471,7 @@ void listarContatosGUI(int *indexes) {
         navegarAgendaGUI(indexes[0]);
     } else {
         contato404GUI();
+        pressContinuar();
     }
 }
 
@@ -471,8 +485,7 @@ void listarContatosRemoverGUI(int *indexes) {
     puts("LISTA DE CONTATOS A SEREM REMOVIDOS");
     puts("=============================================");
     if (indexes[0] >= 0) {
-        // versão remover da navegar aqui
-        // pode deixar que eu faço essa parte
+        navegarAgendaGUI(indexes[0]);
     } else {
         contato404GUI();
     }
